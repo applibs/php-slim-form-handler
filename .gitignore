@@ -1,0 +1,16 @@
+# general
+.*
+*~
+nbproject
+nb-configuration.xml
+Session.vim
+Thumbs.db
+Desktop.ini
+
+# ignore composer packages
+/vendor/*
+
+# keep certain hidden files
+!.htaccess
+!/.gitignore
+!/.travis.yml

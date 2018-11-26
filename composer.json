@@ -1,0 +1,17 @@
+{
+  "name": "firxworx/php-slim-form-handler",
+  "authors": [
+    {
+      "name": "Kevin Firko",
+      "email": "hello@firxworx.com"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Firxworx\\SlimFormHandler\\": "src/inc"
+    }
+  },
+  "require": {
+    "slim/slim": "^3.11"
+  }
+}
