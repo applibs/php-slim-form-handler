@@ -1,0 +1,4 @@
+# Block access to json, example, and other files
+<FilesMatch "\.(json|example|log|txt|xml|ini|sh|md)$">
+    Require all denied
+</FilesMatch>

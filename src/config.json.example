@@ -1,0 +1,12 @@
+{
+  "host": "smtp.example.com",
+  "username": "inbox@example.com",
+  "password": "password",
+  "port": 465,
+  "SMTPAuth": true,
+  "SMTPSecure": "ssl",
+  "fromName": "Sender Name",
+  "fromEmail": "inbox@example.com",
+  "toEmail": "notification-recipient@example.com",
+  "subject": "New Website Contact Form Submission"
+}

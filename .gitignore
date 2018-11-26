@@ -6,9 +6,13 @@ nb-configuration.xml
 Session.vim
 Thumbs.db
 Desktop.ini
+/dev/*
 
 # ignore composer packages
 /vendor/*
+
+# project ignores
+src/config.json
 
 # keep certain hidden files
 !.htaccess

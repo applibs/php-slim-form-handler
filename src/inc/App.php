@@ -5,16 +5,31 @@ namespace Firxworx\SlimFormHandler;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
 
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
 class App
 {
     /**
      * Instance of the Slim API app.
-     *
      * @var \Slim\App
      */
     private $app;
 
-    public function __construct() {
+    /**
+     * Config settings passed to class (loaded from config.json)
+     * @var object
+     */
+    private $config;
+
+    /**
+     * Define the API with basic support for CORS, supporting POST + OPTIONS requests.
+     *
+     * @param object $config
+     */
+    public function __construct($config) {
+
+        $this->config = $config;
 
         $app = new \Slim\App;
 
@@ -32,20 +47,40 @@ class App
                   ->withHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
         });
 
-        /** Debug get request */
-        $app->get('/', function (Request $request, Response $response) {
-            $response->getBody()->write("Hello World");
-            return $response;
-        });
-
         /** Create contact/ group to accept POST requests */
-        $app->post('/', function(Request $request, Response $response){
+        $obj = $this;
+        $app->post('/', function(Request $request, Response $response) use ($obj){
 
           $body = $this->request->getBody();
-          $data = json_decode($body);
+          $data = @json_decode($body);
 
-          return $response->withJson(['status' => 'success', 'data' => $data]);
-          
+          if (JSON_ERROR_NONE !== json_last_error())
+          {
+            return $response->withStatus(400) // bad request
+                            ->withJson(["error" => json_last_error_msg()]);
+          }
+
+
+          if (!$obj->verifyContactFields($data))
+          {
+            return $response->withStatus(406) // not acceptable
+                            ->withJson(["error" => 'Unexpected data fields']);
+          }
+
+          $emailBody = '';
+          foreach ($data as $field => $value) {
+              $emailBody .= "$field: " . trim($value) . "\n";
+          }
+
+          $mail = $obj->sendMail($emailBody);
+
+          if ($mail['success']) {
+            return $response->withJson(['status' => 'success']);
+          } else {
+            return $response->withStatus(500)
+                            ->withJson(['status' => 'error', 'error' => $mail['err']]);
+          }
+
         });
 
         /** Universal route for handling 404 resource Not Found (intentionally defined last) */
@@ -55,6 +90,81 @@ class App
         });
 
         $this->app = $app;
+
+    }
+
+    /**
+     * Verify that exactly the expected fields have been sent to the server with
+     * no missing or extra fields (re the contact form).
+     *
+     * @param object $data object as created by json_decode() of request body
+     * @return bool
+     */
+    public function verifyContactFields($data)
+    {
+
+      if (!is_object($data))
+      {
+        return false;
+      }
+
+      $fields = get_object_vars($data);
+      if (count($fields) !== count($this->config->expectedFields))
+      {
+          return false;
+      }
+
+      foreach ($data as $field => $value)
+      {
+          if (!in_array($field, $this->config->expectedFields))
+          {
+            return false;
+          }
+      }
+
+      return true;
+
+    }
+
+    /**
+     * Send plaintext authenticated SMTP email using PHPMailer package to the
+     * email address specified in project config.json.
+     *
+     * @param string $plainText body of the email
+     * @return array with 'success'=> true or false, 'err' contains info in error case.
+     */
+    public function sendMail($plainText)
+    {
+
+      $mail = new PHPMailer;
+
+      $mail->isSMTP();                                 // switch to smtp
+      $mail->SMTPDebug = 0;                            // 1: errors + messages
+      $mail->Host = $this->config->host;
+      $mail->SMTPAuth = $this->config->smtpAuth;
+      $mail->SMTPSecure = $this->config->smtpSecure;
+      $mail->Port = $this->config->port;
+      $mail->Username = $this->config->username;
+      $mail->Password = $this->config->password;
+
+      $mail->From = $this->config->fromEmail;
+      $mail->FromName = $this->config->fromName;
+      $mail->addAddress($this->config->toEmail);
+      $mail->isHTML(false);                            // if true, you can also set altBody
+      $mail->Subject = $this->config->subject;
+      $mail->Body = $plainText;
+
+      $status = $mail->send();
+
+      if(!$status)
+      {
+        // do not send back smtp-related debug messages to clients ($mail->ErrorInfo)
+        return ["success" => false, "err" => "Error processing form"];
+      }
+      else
+      {
+        return ["success" => true];
+      }
 
     }
 
