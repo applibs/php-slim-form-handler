@@ -23,13 +23,20 @@ class App
     private $config;
 
     /**
+     * Flag to enable or disable live email sending for dev/testing (default true)
+     * @var boolean
+     */
+    private $mailHot;
+
+    /**
      * Define the API with basic support for CORS, supporting POST + OPTIONS requests.
      *
      * @param object $config
      */
-    public function __construct($config) {
+    public function __construct($config, $mailHot = true) {
 
         $this->config = $config;
+        $this->mailHot = $mailHot;
 
         $app = new \Slim\App;
 
@@ -47,24 +54,31 @@ class App
                   ->withHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
         });
 
-        /** Create contact/ group to accept POST requests */
+        /** Handle POST requests (contact form submissions) */
         $obj = $this;
         $app->post('/', function(Request $request, Response $response) use ($obj){
+
+          $contentType = $request->getContentType();
+          if (strpos($contentType, 'application/json') === false) {
+            return $response->withStatus(415)   // unsupported media type
+                            ->withJson(["error" => "Unsupported media type"]);
+          }
+
+          // slim will recognize and attempt to parse bodies w/ json headers
 
           $body = $this->request->getBody();
           $data = @json_decode($body);
 
           if (JSON_ERROR_NONE !== json_last_error())
           {
-            return $response->withStatus(400) // bad request
+            return $response->withStatus(400)   // bad request
                             ->withJson(["error" => json_last_error_msg()]);
           }
 
-
           if (!$obj->verifyContactFields($data))
           {
-            return $response->withStatus(406) // not acceptable
-                            ->withJson(["error" => 'Unexpected data fields']);
+            return $response->withStatus(406)   // not acceptable
+                            ->withJson(["error" => 'Unexpected or missing data field(s)']);
           }
 
           $emailBody = '';
@@ -72,10 +86,17 @@ class App
               $emailBody .= "$field: " . trim($value) . "\n";
           }
 
-          $mail = $obj->sendMail($emailBody);
+          if ($obj->mailHot) {
+            $mail = $obj->sendMail($emailBody);
+          } else {
+            $mail = [];
+            $mail['disabled'] = true;
+          }
 
-          if ($mail['success']) {
+          if (isset($mail['success']) && $mail['success']) {
             return $response->withJson(['status' => 'success']);
+          } elseif (isset($mail['disabled']) && $mail['disabled']) {
+            return $response->withJson(['status' => 'disabled']);
           } else {
             return $response->withStatus(500)
                             ->withJson(['status' => 'error', 'error' => $mail['err']]);
@@ -141,8 +162,8 @@ class App
       $mail->isSMTP();                                 // switch to smtp
       $mail->SMTPDebug = 0;                            // 1: errors + messages
       $mail->Host = $this->config->host;
-      $mail->SMTPAuth = $this->config->smtpAuth;
-      $mail->SMTPSecure = $this->config->smtpSecure;
+      $mail->SMTPAuth = $this->config->SMTPAuth;
+      $mail->SMTPSecure = $this->config->SMTPSecure;
       $mail->Port = $this->config->port;
       $mail->Username = $this->config->username;
       $mail->Password = $this->config->password;
