@@ -33,7 +33,8 @@ class App
      *
      * @param object $config
      */
-    public function __construct($config, $mailHot = true) {
+    public function __construct($config, $mailHot = true)
+    {
 
         $this->config = $config;
         $this->mailHot = $mailHot;
@@ -56,7 +57,7 @@ class App
 
         /** Handle POST requests (contact form submissions) */
         $obj = $this;
-        $app->post('/', function(Request $request, Response $response) use ($obj){
+        $app->post('/', function(Request $request, Response $response) use ($obj) {
 
           $contentType = $request->getContentType();
           if (strpos($contentType, 'application/json') === false) {
@@ -69,14 +70,12 @@ class App
           $body = $this->request->getBody();
           $data = @json_decode($body);
 
-          if (JSON_ERROR_NONE !== json_last_error())
-          {
+          if (JSON_ERROR_NONE !== json_last_error()) {
             return $response->withStatus(400)   // bad request
                             ->withJson(["error" => json_last_error_msg()]);
           }
 
-          if (!$obj->verifyContactFields($data))
-          {
+          if (!$obj->verifyContactFields($data)) {
             return $response->withStatus(406)   // not acceptable
                             ->withJson(["error" => 'Unexpected or missing data field(s)']);
           }
@@ -124,21 +123,17 @@ class App
     public function verifyContactFields($data)
     {
 
-      if (!is_object($data))
-      {
+      if (!is_object($data)) {
         return false;
       }
 
       $fields = get_object_vars($data);
-      if (count($fields) !== count($this->config->expectedFields))
-      {
+      if (count($fields) !== count($this->config->expectedFields)) {
           return false;
       }
 
-      foreach ($data as $field => $value)
-      {
-          if (!in_array($field, $this->config->expectedFields))
-          {
+      foreach ($data as $field => $value) {
+          if (!in_array($field, $this->config->expectedFields)) {
             return false;
           }
       }
@@ -177,13 +172,11 @@ class App
 
       $status = $mail->send();
 
-      if(!$status)
-      {
+      if(!$status) {
         // do not send back smtp-related debug messages to clients ($mail->ErrorInfo)
         return ["success" => false, "err" => "Error processing form"];
       }
-      else
-      {
+      else {
         return ["success" => true];
       }
 
